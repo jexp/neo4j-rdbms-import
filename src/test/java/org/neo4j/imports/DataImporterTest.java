@@ -1,10 +1,12 @@
 package org.neo4j.imports;
 
+import org.junit.Assert;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
+import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.io.fs.FileUtils;
 import org.neo4j.tooling.GlobalGraphOperations;
 import schemacrawler.schema.Catalog;
@@ -27,7 +29,22 @@ import java.util.Properties;
  */
 public class DataImporterTest {
 
+    public static final String STORE_DIR = "target/test.db";
+    public static final int USERS = 100000;
+    public static final int FRIENDSHIPS = 100000;
+
     public static void main(String[] args) throws Exception {
+        setupDatabase();
+
+        FileUtils.deleteRecursively(new File(STORE_DIR));
+        long time = System.currentTimeMillis();
+        new DatabaseImporter("jdbc:derby:memory:test", STORE_DIR).run();
+
+        String result = assertImport();
+        System.out.println(result+ " in "+(System.currentTimeMillis()-time)/1000+ " seconds");
+    }
+
+    private static void setupDatabase() throws SQLException {
         Connection connection = DriverManager.getConnection("jdbc:derby:memory:test;create=true", new Properties());
         Statement statement = connection.createStatement();
         // id INT NOT NULL GENERATED ALWAYS AS IDENTITY (START WITH 0, INCREMENT BY 1)
@@ -36,23 +53,45 @@ public class DataImporterTest {
                 " constraint fk_users_id1 foreign key(id1) references users(id)," +
                 " constraint fk_users_id2 foreign key(id2) references users(id)" +
                 ")");
-        statement.execute("INSERT INTO USERS (id,name) values(0,'Alice')");
-        statement.execute("INSERT INTO USERS (id,name) values(1,'Bob')");
-        statement.execute("INSERT INTO FRIENDS (id1,id2) values(0,1)");
+        insertUsers(connection, USERS);
+        insertFriendships(connection, FRIENDSHIPS);
+//        statement.execute("INSERT INTO USERS (id,name) values(0,'Alice')");
+//        statement.execute("INSERT INTO USERS (id,name) values(1,'Bob')");
+//        statement.execute("INSERT INTO FRIENDS (id1,id2) values(0,1)");
+    }
 
+    private static String assertImport() {
+        GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase(STORE_DIR);
 
-        FileUtils.deleteRecursively(new File("target/test.db"));
-        new DatabaseImporter("jdbc:derby:memory:test","target/test.db").run();
-
-        GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase("target/test.db");
         try (Transaction tx = db.beginTx()) {
-            for (Node node : db.getAllNodes()) {
-                System.out.println(node);
-            }
-            for (Relationship relationship : GlobalGraphOperations.at(db).getAllRelationships()) {
-                System.out.println(relationship);
-            }
+            int nodes = IteratorUtil.count(db.getAllNodes());
+            Assert.assertEquals(USERS, nodes);
+            int rels = IteratorUtil.count(GlobalGraphOperations.at(db).getAllRelationships());
+            Assert.assertEquals(FRIENDSHIPS, rels);
+            return "Imported nodes "+nodes+" rels "+rels;
+        } finally {
+            db.shutdown();
         }
-        db.shutdown();
+    }
+
+    private static void insertUsers(Connection connection, int max) throws SQLException {
+        PreparedStatement pstmt = connection.prepareStatement("INSERT INTO USERS (id,name) values(?,?)");
+        for (int i=0;i<max;i++) {
+            pstmt.setInt(1,i);
+            pstmt.setString(2,"Name "+i);
+            pstmt.addBatch();
+        }
+        pstmt.executeBatch();
+        pstmt.close();
+    }
+    private static void insertFriendships(Connection connection, int max) throws SQLException {
+        PreparedStatement pstmt = connection.prepareStatement("INSERT INTO FRIENDS (id1,id2) values(?,?)");
+        for (int i=0;i<max;i++) {
+            pstmt.setInt(1,i);
+            pstmt.setInt(2, (i + 100) % max);
+            pstmt.addBatch();
+        }
+        pstmt.executeBatch();
+        pstmt.close();
     }
 }

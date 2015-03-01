@@ -19,7 +19,6 @@ import org.neo4j.unsafe.impl.batchimport.staging.ExecutionMonitors;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -49,56 +48,27 @@ public class DatabaseImporter {
         ParallelBatchImporter importer = new ParallelBatchImporter(storeDir, Configuration.DEFAULT, logging, ExecutionMonitors.defaultVisible());
         TableInfo[] tables = MetaDataReader.extractTables(conn);
 
-        ArrayBlockingQueue<InputNode> nodes = new ArrayBlockingQueue<InputNode>(1_000_000);
-        ArrayBlockingQueue<InputRelationship> rels = new ArrayBlockingQueue<InputRelationship>(10_000_000);
+        Queues<InputNode> nodes = new Queues<InputNode>(1,1_000_000);
+        Queues<InputRelationship> rels = new Queues<InputRelationship>(2,10_000_000);
         for (TableInfo table : tables) {
             ResultSet rs = DataReader.readTableData(conn, table);
             new Transformer().stream(table, rules,rs,nodes,rels);
         }
+        nodes.put(Transformer.END_NODE);
+        rels.put(Transformer.END_REL);
         importer.doImport(createInput(nodes,rels));
     }
 
-    private Input createInput(final BlockingQueue<InputNode> nodes, final BlockingQueue<InputRelationship> rels) {
+    private Input createInput(final Queues<InputNode> nodes, final Queues<InputRelationship> rels) {
         return new Input() {
             @Override
             public InputIterable<InputNode> nodes() {
-                return new QueueInputIterable(nodes);
+                return new QueueInputIterable<>(Transformer.END_NODE, nodes);
             }
 
             @Override
             public InputIterable<InputRelationship> relationships() {
-                return new InputIterable<InputRelationship>() {
-                    @Override
-                    public InputIterator<InputRelationship> iterator() {
-                        return new InputIterator<InputRelationship>() {
-                            long position = 0;
-                            @Override
-                            public long position() {
-                                return position++;
-                            }
-
-                            @Override
-                            public void close() {
-//                                Thread.currentThread().interrupt();
-                            }
-
-                            @Override
-                            public boolean hasNext() {
-                                return !rels.isEmpty();
-                            }
-
-                            @Override
-                            public InputRelationship next() {
-                                try {
-                                    return rels.take();
-                                } catch (InterruptedException e) {
-                                    Thread.currentThread().interrupt();
-                                    throw new RuntimeException(e);
-                                }
-                            }
-                        };
-                    }
-                };
+                return new QueueInputIterable<>(Transformer.END_REL, rels);
             }
 
             @Override
@@ -119,23 +89,28 @@ public class DatabaseImporter {
     }
 
     private static class QueueInputIterable<T> implements InputIterable<T> {
-        private final BlockingQueue<T> queue;
+        private final Queues<T> queues;
+        private final T tombstone;
+        private int index = 0;
 
-        public QueueInputIterable(BlockingQueue<T> queue) {
-            this.queue = queue;
+        public QueueInputIterable(T tombstone, Queues<T> queues) {
+            this.queues = queues;
+            this.tombstone = tombstone;
         }
 
         @Override
         public InputIterator<T> iterator() {
+            System.out.println("iterator "+ type());
+            final BlockingQueue<T> queue = nextQueue();
             return new InputIterator<T>() {
                 long position;
-                T element;
-                boolean hasNext;
+                T element = nextElement();
 
-                private void nextElement() {
+                private T nextElement() {
                     try {
-                        element = queue.take();
-                        position ++;
+                        position++;
+                        T next = queue.take();
+                        return next.equals(tombstone) ? null : next;
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         throw new RuntimeException(e);
@@ -154,15 +129,24 @@ public class DatabaseImporter {
 
                 @Override
                 public boolean hasNext() {
-                    return hasNext;
+                    return element != null;
                 }
 
                 @Override
                 public T next() {
-                    nextElement();
-                    return element;
+                    T current = element;
+                    element = nextElement();
+                    return current;
                 }
             };
+        }
+
+        private String type() {
+            return tombstone.getClass().getSimpleName();
+        }
+
+        private BlockingQueue<T> nextQueue() {
+            return queues.queue(index++);
         }
     }
 }

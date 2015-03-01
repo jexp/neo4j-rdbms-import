@@ -17,8 +17,10 @@ import java.util.concurrent.BlockingQueue;
 public class Transformer {
 
     private static final Object[] NO_PROPS = new Object[0];
+    public static final InputNode END_NODE = new InputNode(-1, null, null, null, null);
+    public static final InputRelationship END_REL = new InputRelationship(null,null, -1,-1,null,null);
 
-    public void stream(TableInfo table, Rules rules, final ResultSet rs, BlockingQueue<InputNode> nodes, BlockingQueue<InputRelationship> rels) throws SQLException, InterruptedException {
+    public void stream(TableInfo table, Rules rules, final ResultSet rs, Queues<InputNode> nodes, Queues<InputRelationship> rels) throws SQLException, InterruptedException {
         if (rules.isNode(table)) {
             streamNodes(table, rules, rs, nodes, rels);
         } else {
@@ -26,7 +28,7 @@ public class Transformer {
         }
     }
 
-    public void streamNodes(TableInfo table, Rules rules, final ResultSet rs, BlockingQueue<InputNode> nodes, BlockingQueue<InputRelationship> rels) throws SQLException, InterruptedException {
+    public void streamNodes(TableInfo table, Rules rules, final ResultSet rs, Queues<InputNode> nodes, Queues<InputRelationship> rels) throws SQLException, InterruptedException {
         Group group = new Group.Adapter(table.index, table.table);
         String[] labels = rules.labelsFor(table);
         Object[] props = prepareProps(table, rules);
@@ -66,16 +68,17 @@ public class Transformer {
         return props;
     }
 
-    public void streamRels(TableInfo table, Rules rules, final ResultSet rs, BlockingQueue<InputRelationship> rels) throws SQLException, InterruptedException {
+    public void streamRels(TableInfo table, Rules rules, final ResultSet rs, Queues<InputRelationship> rels) throws SQLException, InterruptedException {
         String relType = rules.relTypeFor(table);
         Object[] props = prepareProps(table,rules);
         RelInfo[] relInfos = rules.relsFor(table);
 
         while (rs.next()) {
-            rels.put(new InputRelationship(extractProps(table,rs,props), null,
+            InputRelationship inputRelationship = new InputRelationship(extractProps(table, rs, props), null,
                     relInfos[0].group, rules.transformPk(rs.getObject(relInfos[0].field)),
                     relInfos[1].group, rules.transformPk(rs.getObject(relInfos[1].field)),
-                    relType, null));
+                    relType, null);
+            rels.put(inputRelationship);
         }
     }
 }
