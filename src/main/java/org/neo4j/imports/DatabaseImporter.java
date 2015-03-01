@@ -48,8 +48,8 @@ public class DatabaseImporter {
         ParallelBatchImporter importer = new ParallelBatchImporter(storeDir, Configuration.DEFAULT, logging, ExecutionMonitors.defaultVisible());
         TableInfo[] tables = MetaDataReader.extractTables(conn);
 
-        Queues<InputNode> nodes = new Queues<InputNode>(1,1_000_000);
-        Queues<InputRelationship> rels = new Queues<InputRelationship>(2,10_000_000);
+        Queues<InputNode> nodes = new Queues<>(2,1_000_000);
+        Queues<InputRelationship> rels = new Queues<>(2,10_000_000);
         for (TableInfo table : tables) {
             ResultSet rs = DataReader.readTableData(conn, table);
             new Transformer().stream(table, rules,rs,nodes,rels);

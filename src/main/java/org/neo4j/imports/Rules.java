@@ -2,6 +2,8 @@ package org.neo4j.imports;
 
 import org.neo4j.unsafe.impl.batchimport.input.Group;
 
+import java.math.BigDecimal;
+import java.util.Date;
 import java.util.Map;
 
 /**
@@ -54,5 +56,13 @@ public class Rules {
 
     public Object transformPk(Object pk) {
         if (pk==null) return null; else return pk.toString();
+    }
+
+    public Object convertValue(TableInfo table, String field, Object value) {
+        if (value instanceof Date) return ((Date)value).getTime();
+        if (value instanceof BigDecimal) return ((BigDecimal)value).doubleValue(); // or string??
+        // todo importer should ignore null values
+        if (value == null) return "";
+        return value;
     }
 }
