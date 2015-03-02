@@ -1,0 +1,112 @@
+== Building an Import Tool for Relational to Neo4j over one Iekend
+
+Last Saturday Night around 11pm when the family was fast asleep, I decided to finally write a tool that I had wanted to build for a while...
+
+=== An automatic importer for relational databases wento Neo4j.
+
+I had all the ingredients at hand
+
+. JDBC for accessing relational databases, and http://schemacrawler.sourceforge.net/how-to.html[SchemaCrawler] for a convenient way of extracting the meta-information. SchemaSpy would have worked as well.
+. http://neo4j.com/download#milestone[Neo4j 2.2] with its massively scalable parallel batch importer API (which is also the foundation for the http://neo4j.com/docs/milestone/import-tool.html[neo4j-import tool]). +
+This API also takes care of linking of nodes via external id's (which don't have to be stored).
+. And a bunch of ideas on how to declare rules for deciding what should become a node and what a relationship:
+
+==== My Transformation Rules:
+
+* tables become *nodes*, the primary key becomes the linking-id (doesn't have to be stored)
+* foreign keys for 1:1, 1:n and n:1 references become relationships from that node
+* if a table has no primary key and two foreign-keys it becomes a *relationship*
+* tables and fields can be skipped
+* their names can be transformed (with a distinction between labels and relationship-types)
+* column values can be transformed as well (e.g. dates or decimals), null values are skipped
+
+Implementing the tool was pretty straightforward, so everyone should be able to do something similar.
+Some details were a bit devilish, I'll mention these in the appropriate places.
+The following sections explain some of the technical details, if you're only interested in how to use the tool jump forward to the <<example_section>>.
+
+****
+The class orchestrating the import is called `DataImporter`. You can call its main method with JDBC-URL, schema-name and Neo4j directory name.
+
+The first step was connecting to the relational database using the provided _JDBC-URL_.
+Extracting the database metadata into our own `TableInfo`-objects was next. I extracted table name, primary and foreign keys. This happens in `MetaDataReader`.
+
+Next in line was setting up the [ParallelBatchImporter] with default values for configuration, loggers and monitors.
+It expects its `Input` as two iterables for `InputNodes` and `InputRelationships`.
+
+For each of the tables found, I read their content using plain SQL in `DataReader` returning a `ResultSet`.
+Those results are transformed in `Transformer.stream()` wento InputNodes and InputRelationships according to the rules listed above.
+
+The tricky thing here was that one row can result in multiple Inputs (e.g. a row with several foreign keys to other tables), so I couldn't use the Iterator abstraction.
+That's why I decided to go with two blocking, limited Queues for nodes and relationships respectively which are filled from the transformed relational result streams.
+Using a Tombstone to signal the end of processing, I could convert the Queues to Iterators in a straightforward manner.
+
+The multi-pass approach of the parallel-importer API posed another challenge, which I worked around by filling multiple queues. This is an area that has to be improved.
+****
+
+My first test was a simple _Users being Friends_ database that I created in memory using Apache Derby, that went pretty well.
+
+Looking for some MySQL demo databases, I found the http://dev.mysql.com/doc/sakila/en/sakila-structure.html[Sakila artist database] which could be imported out of the box but highlighted a concurrency issue - the parallel importer had to be started in a separate thread so that the reading from the relational database could progress in parallel.
+
+And the much larger https://dev.mysql.com/doc/employee/en/sakila-structure.html[employees database]. 
+This one showed some peculiarities especially around composite primary and foreign keys. Especially foreign keys that are the same time part of the primary key are nasty.
+This forced me to extend the originally simple meta-data-model to cater for these cases.
+
+But all prepared the tool really well for the final example.
+
+[[example_section]]
+=== Example
+
+Of course the obligatory Northwind example couldn't be left out. 
+We also use it as an http://neo4j.com/developer/guide-importing-data-and-etl/[example for Cypher's LOAD CSV statement] and to compare http://neo4j.com/developer/guide-sql-to-cypher[Cypher with SQL]. 
+So I downloaded the import script 
+https://code.google.com/p/northwindextended/downloads/detail?name=Northwind.MySQL5.sql[from here] and ran the it in my local MySQL server.
+
+----
+myql -u root < /path/to/Northwind.MySQL5.sql
+----
+
+////
+Tables included in this dataset are:
+
+----
++--------------------------------+
+| Categories                     |
+| CustomerCustomerDemo           |
+| CustomerDemographics           |
+| Customers                      |
+| EmployeeTerritories            |
+| Employees                      |
+| Order Details                  |
+| Orders                         |
+| Products                       |
+| Region                         |
+| Shippers                       |
+| Suppliers                      |
+| Territories                    |
++--------------------------------+
+----
+////
+
+I ran the import tool with these parameters: `import-rdbms-mvn.sh "jdbc:mysql://localhost:3306/northwind?user=root" "northwind" "northwind.db"`
+It extracted the metadata, and the row-data from MySQL and imported it in into Neo4j. All in 3 seconds.
+
+Looking at the meta-information in the Neo4j Browser shows that all expected labels and relationships are there.
+It nicely imported the `OrderDetails` and `EmployeeTerritories` JOIN-tables as relationships.
+
+****
+To see the database in Neo4j Browser, shutdown Neo4j first with `bin/neo4j stop` then you either have 
+
+. to configure the path to the database in `conf/neo4j-server.properties` or
+. copy the directory contents into `data/graph.db`
+****
+
+image::northwind_import.png[]
+
+As I was flying to London on Sunday I had enough time to finish the first iteration and write this blog post. So a weekend well spent.
+
+Here you can find the tool: https://github.com/jexp/neo4j-rdbms-import
+
+*PLEASE* test it out with your relational databases and send me feedback, best as https://github.com/jexp/neo4j-rdbms-import/issues[GitHub Issues].
+
+There are some more ideas, especially around paralellizing the reads from the relational database, 
+configuring the mentioned rules and transformation and packaging it all up in to a nice little tool that can also be used by non-developers.

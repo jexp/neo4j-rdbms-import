@@ -3,6 +3,8 @@
 Scans Database Metadata to determine how to model
 Uses Parallel Batch Importer to ingest data from all tables in parallel
 
+Blog Post: link:docs/relational_to_neo4j_import_tool.adoc[]
+
 === Usage
 
 Currently you need http://maven.apache.org/download.cgi[apache maven] installed.
