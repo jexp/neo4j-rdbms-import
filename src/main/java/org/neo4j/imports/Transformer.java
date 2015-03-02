@@ -15,8 +15,8 @@ import java.util.Arrays;
 public class Transformer {
 
     private static final Object[] NO_PROPS = new Object[0];
-    public static final InputNode END_NODE = new InputNode(-1, null, null, null, null);
-    public static final InputRelationship END_REL = new InputRelationship(null,null, -1,-1,null,null);
+    public static final InputNode END_NODE = new InputNode(null,-1,-1,-1, null, null, null, null);
+    public static final InputRelationship END_REL = new InputRelationship(null,-1,-1,null,null, -1,-1,null,null);
 
     public void stream(TableInfo table, Rules rules, final ResultSet rs, Queues<InputNode> nodes, Queues<InputRelationship> rels) throws SQLException, InterruptedException {
         System.out.println("Reading Table as node? "+rules.isNode(table)+" "+table);
@@ -34,17 +34,30 @@ public class Transformer {
         RelInfo[] relInfos = rules.relsFor(table);
 
         while (rs.next()) {
-            Object id = rules.transformPk(rs.getObject(table.pk));
-            nodes.put(new InputNode(group, id, extractProps(table, rules, rs, props), null, labels, null));
+            Object id = extractPrimaryKeys(rules, rs, table.pk);
+            nodes.put(new InputNode(table.table, rs.getRow(),0,group, id, extractProps(table, rules, rs, props), null, labels, null));
 
             for (RelInfo relInfo : relInfos) {
-                Object fkId = rules.transformPk(rs.getObject(relInfo.field));
+                Object fkId = extractPrimaryKeys(rules,rs,relInfo.fields);
                 if (fkId==null) continue;
-                InputRelationship relationship = new InputRelationship(NO_PROPS, null, group, id, relInfo.group, fkId, relInfo.type, null);
+                InputRelationship relationship = new InputRelationship(table.table + "." + relInfo.fieldsString, rs.getRow(),0,NO_PROPS, null, group, id, relInfo.group, fkId, relInfo.type, null);
                 rels.put(relationship);
             }
         }
         ;
+    }
+
+    private Object extractPrimaryKeys(Rules rules, ResultSet rs, String[] pks) throws SQLException {
+        // todo prepend table name instead of using groups (hint from MP)
+        StringBuilder sb = new StringBuilder(32);
+        for (String pk : pks) {
+            Object value = rules.transformPk(rs.getObject(pk));
+            if (value==null) return null; // if one fk-part is null then the whole fk is invalid, or??
+
+            sb.append(value);
+            sb.append((char)0);
+        }
+        return sb.toString();
     }
 
     private Object[] prepareProps(TableInfo table, Rules rules) {
@@ -75,10 +88,10 @@ public class Transformer {
         RelInfo[] relInfos = rules.relsFor(table);
 
         while (rs.next()) {
-            Object fk1 = rules.transformPk(rs.getObject(relInfos[0].field));
-            Object fk2 = rules.transformPk(rs.getObject(relInfos[1].field));
+            Object fk1 = extractPrimaryKeys(rules,rs,relInfos[0].fields);
+            Object fk2 = extractPrimaryKeys(rules,rs,relInfos[1].fields);
             if (fk1 == null || fk2 == null) continue;
-            InputRelationship inputRelationship = new InputRelationship(extractProps(table, rules, rs, props), null,
+            InputRelationship inputRelationship = new InputRelationship(table.table, rs.getRow(),0,extractProps(table, rules, rs, props), null,
                     relInfos[0].group, fk1,
                     relInfos[1].group, fk2,
                     relType, null);

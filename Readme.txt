@@ -1,17 +1,30 @@
-Relational to Neo4j Importer
+== Relational to Neo4j Importer
 
 Scans Database Metadata to determine how to model
 Uses Parallel Batch Importer to ingest data from all tables in parallel
 
-Transformation Rules
+=== Usage
+
+Currently you need http://maven.apache.org/download.cgi[apache maven] installed.
+
+Command line parameters are:
+
+`import-rdbms-mvn.sh "jdbc:url" "schema" "graph.db"`
+
+e.g.
+
+`import-rdbms-mvn.sh "jdbc:mysql://localhost:3306/northwind?user=root" "northwind" "northwind.db"`
+
+
+=== Transformation Rules
 
 * Table with primary key become nodes
 * FK (1:1, 1:n and n:1) become relationships
-* Tables with no FK exactly two FK and properties become relationships (optional also if there is a pk)
-* Tables with two or more FK become nodes
+* Tables with no PK and exactly two FK and properties become relationships (optionally also if there is a pk)
+* Tables with more than two FK become nodes
 * remove all fk fields
 
-Todo
+=== Todo
 
 * Table name, column name transformation
 * Modeling Rules by table name pattern

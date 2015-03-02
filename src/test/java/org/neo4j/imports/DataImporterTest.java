@@ -2,24 +2,13 @@ package org.neo4j.imports;
 
 import org.junit.Assert;
 import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.io.fs.FileUtils;
 import org.neo4j.tooling.GlobalGraphOperations;
-import schemacrawler.schema.Catalog;
-import schemacrawler.schema.Column;
-import schemacrawler.schema.Schema;
-import schemacrawler.schema.Table;
-import schemacrawler.schemacrawler.SchemaCrawlerException;
-import schemacrawler.schemacrawler.SchemaCrawlerOptions;
-import schemacrawler.schemacrawler.SchemaInfoLevel;
-import schemacrawler.utility.SchemaCrawlerUtility;
 
 import java.io.File;
-import java.io.PrintWriter;
 import java.sql.*;
 import java.util.Properties;
 
@@ -38,7 +27,7 @@ public class DataImporterTest {
 
         FileUtils.deleteRecursively(new File(STORE_DIR));
         long time = System.currentTimeMillis();
-        new DatabaseImporter("jdbc:derby:memory:test", STORE_DIR).run();
+        new DatabaseImporter("jdbc:derby:memory:test",null, STORE_DIR).run(new Rules());
 
         String result = assertImport();
         System.out.println(result+ " in "+(System.currentTimeMillis()-time)/1000+ " seconds");

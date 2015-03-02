@@ -3,8 +3,7 @@ package org.neo4j.imports;
 import org.neo4j.unsafe.impl.batchimport.input.Group;
 
 import java.math.BigDecimal;
-import java.util.Date;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author mh
@@ -13,6 +12,15 @@ import java.util.Map;
 public class Rules {
 
     public static final RelInfo[] NO_REL_INFOS = new RelInfo[0];
+    private final Set<String> skipTables = new HashSet<>();
+
+    public Rules() {
+        this(null);
+    }
+    public Rules(Collection<String> skipTables) {
+        if (skipTables!=null)
+            this.skipTables.addAll(skipTables);
+    }
 
     String propertyNameFor(TableInfo table, String field) {
         return field;
@@ -32,11 +40,20 @@ public class Rules {
     }
 
     String[] labelsFor(TableInfo table) {
-        return new String[]{table.table};
+        return new String[]{labelFor(table.table)};
+    }
+
+    public String labelFor(String table) {
+        return unquote(table);
+    }
+
+    private String unquote(String name) {
+        boolean quoted = name.charAt(0) == '`';
+        return quoted ? name.substring(1,name.length()-1) : name;
     }
 
     String relTypeFor(TableInfo table) {
-        return table.table;
+        return unquote(table.table).replaceAll("([a-z]) ?([A-Z])","$1_$2").toUpperCase().replace(' ','_');
     }
 
     boolean isNode(TableInfo table) {
@@ -47,9 +64,13 @@ public class Rules {
         if (table.fks == null) return NO_REL_INFOS;
         RelInfo[] result = new RelInfo[table.fks.size()];
         int i = 0;
-        for (Map.Entry<String, String> entry : table.fks.entrySet()) {
+        for (Map.Entry<List<String>, String> entry : table.fks.entrySet()) {
             TableInfo tableInfo = TableInfo.get(entry.getValue());
-            result[i++] = new RelInfo(new Group.Adapter(tableInfo.index, tableInfo.table), relTypeFor(tableInfo), entry.getKey());
+            Group.Adapter group = new Group.Adapter(tableInfo.index, tableInfo.table);
+            List<String> fks = entry.getKey();
+            // todo fix
+            String[] fields = fks.toArray(new String[fks.size()]);
+            result[i++] = new RelInfo(group, relTypeFor(tableInfo), fields);
         }
         return result;
     }
@@ -64,5 +85,14 @@ public class Rules {
         // todo importer should ignore null values
         if (value == null) return "";
         return value;
+    }
+
+
+    public boolean skipTable(String tableName) {
+        return skipTables.contains(tableName);
+    }
+
+    public boolean skipPrimaryKey(String tableName, String columnName) {
+        return false;
     }
 }

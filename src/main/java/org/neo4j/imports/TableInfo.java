@@ -2,6 +2,7 @@ package org.neo4j.imports;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -15,11 +16,11 @@ public class TableInfo {
 
     public final int index = TABLE_INDEX.getAndIncrement();
     public final String table;
-    public final String pk;
+    public final String[] pk;
     public final String[] fields;
-    public final Map<String,String> fks;
+    public final Map<List<String>, String> fks;
 
-    public TableInfo(String table, String pk, String[] fields, Map<String, String> fks) {
+    public TableInfo(String table, String[] pk, String[] fields, Map<List<String>, String> fks) {
         this.table = table;
         this.pk = pk;
         this.fields = fields;
@@ -27,7 +28,7 @@ public class TableInfo {
     }
 
     public boolean hasPk() {
-        return pk != null;
+        return pk != null && pk.length > 0;
     }
 
     public int fieldCount() {
@@ -38,8 +39,8 @@ public class TableInfo {
         return TABLES.get(table);
     }
 
-    public static TableInfo add(String table, String pk, String[] fields, Map<String, String> fks) {
-        TableInfo tableInfo = new TableInfo(table, pk, fields, fks);
+    public static TableInfo add(String table, String[] pks, String[] fields, Map<List<String>, String> fks) {
+        TableInfo tableInfo = new TableInfo(table, pks, fields, fks);
         TABLES.put(table, tableInfo);
         return tableInfo;
     }
@@ -49,7 +50,7 @@ public class TableInfo {
         return "TableInfo{" +
                 "index=" + index +
                 ", table='" + table + '\'' +
-                ", pk='" + pk + '\'' +
+                ", pk='" + Arrays.toString(pk) + '\'' +
                 ", fields=" + Arrays.toString(fields) +
                 ", fks=" + fks +
                 '}';

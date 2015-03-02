@@ -11,15 +11,19 @@ import org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdGenerator;
 import org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdGenerators;
 import org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMapper;
 import org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMappers;
+import org.neo4j.unsafe.impl.batchimport.input.Collector;
 import org.neo4j.unsafe.impl.batchimport.input.Input;
 import org.neo4j.unsafe.impl.batchimport.input.InputNode;
 import org.neo4j.unsafe.impl.batchimport.input.InputRelationship;
 import org.neo4j.unsafe.impl.batchimport.staging.ExecutionMonitors;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author mh
@@ -29,46 +33,64 @@ public class DatabaseImporter {
 
     String jdbcUrl;
     String storeDir;
+    private String schema;
 
     public static void main(String[] args) throws Exception {
-        new DatabaseImporter(args[0],args[1]).run();
+        new DatabaseImporter(args[0],args[1],args[2]).run(new Rules());
     }
 
 
-    public DatabaseImporter(String jdbcUrl, String storeDir) {
+    public DatabaseImporter(String jdbcUrl, String schema, String storeDir) {
         this.jdbcUrl = jdbcUrl;
+        this.schema = schema;
         this.storeDir = storeDir;
     }
 
-    public void run() throws Exception {
+    public void run(Rules rules) throws Exception {
         Connection conn = DriverManager.getConnection(jdbcUrl);
-        Rules rules = new Rules();
 
         Logging logging = new SystemOutLogging();
-        ParallelBatchImporter importer = new ParallelBatchImporter(storeDir, Configuration.DEFAULT, logging, ExecutionMonitors.defaultVisible());
-        TableInfo[] tables = MetaDataReader.extractTables(conn);
+        final ParallelBatchImporter importer = new ParallelBatchImporter(storeDir, Configuration.DEFAULT, logging, ExecutionMonitors.defaultVisible());
+        TableInfo[] tables = MetaDataReader.extractTables(conn, schema, rules);
 
-        Queues<InputNode> nodes = new Queues<>(2,1_000_000);
-        Queues<InputRelationship> rels = new Queues<>(2,10_000_000);
+        final Queues<InputNode> nodes = new Queues<>(2,10_000_000);
+        final Queues<InputRelationship> rels = new Queues<>(2,50_000_000);
+        final AtomicBoolean done = new AtomicBoolean();
+        Thread thread = new Thread() {
+            public void run() {
+                try {
+                    importer.doImport(createInput(nodes, rels));
+                    done.set(true);
+                } catch (IOException ioe) {
+                    throw new RuntimeException("Error Importing Data", ioe);
+                }
+            }
+        };
+        thread.start();
+
         for (TableInfo table : tables) {
             ResultSet rs = DataReader.readTableData(conn, table);
             new Transformer().stream(table, rules,rs,nodes,rels);
         }
         nodes.put(Transformer.END_NODE);
         rels.put(Transformer.END_REL);
-        importer.doImport(createInput(nodes,rels));
+        while (!done.get()) {
+//            Thread.sleep(200);
+            Thread.yield();
+        }
+        thread.join();
     }
 
     private Input createInput(final Queues<InputNode> nodes, final Queues<InputRelationship> rels) {
         return new Input() {
             @Override
             public InputIterable<InputNode> nodes() {
-                return new QueueInputIterable<>(Transformer.END_NODE, nodes);
+                return new QueueInputIterable<>(Transformer.END_NODE, nodes, jdbcUrl+" schema: "+schema);
             }
 
             @Override
             public InputIterable<InputRelationship> relationships() {
-                return new QueueInputIterable<>(Transformer.END_REL, rels);
+                return new QueueInputIterable<>(Transformer.END_REL, rels, jdbcUrl+" schema: "+schema);
             }
 
             @Override
@@ -85,6 +107,17 @@ public class DatabaseImporter {
             public boolean specificRelationshipIds() {
                 return false;
             }
+
+            @Override
+            public Collector<InputRelationship> badRelationshipsCollector(OutputStream outputStream) {
+                return new Collector.Adapter<InputRelationship>() {
+                    @Override
+                    public void collect(InputRelationship inputRelationship, Object o) {
+                        System.err.println("Bad Rel: "+inputRelationship);
+                        throw new RuntimeException("Bad Rel");
+                    }
+                };
+            }
         };
     }
 
@@ -92,10 +125,12 @@ public class DatabaseImporter {
         private final Queues<T> queues;
         private final T tombstone;
         private int index = 0;
+        private String source;
 
-        public QueueInputIterable(T tombstone, Queues<T> queues) {
+        public QueueInputIterable(T tombstone, Queues<T> queues, String source) {
             this.queues = queues;
             this.tombstone = tombstone;
+            this.source = source;
         }
 
         @Override
@@ -115,6 +150,16 @@ public class DatabaseImporter {
                         Thread.currentThread().interrupt();
                         throw new RuntimeException(e);
                     }
+                }
+
+                @Override
+                public String sourceDescription() {
+                    return source;
+                }
+
+                @Override
+                public long lineNumber() {
+                    return position;
                 }
 
                 @Override
