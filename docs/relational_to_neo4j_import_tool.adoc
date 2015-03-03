@@ -100,7 +100,7 @@ To see the database in Neo4j Browser, shutdown Neo4j first with `bin/neo4j stop`
 . copy the directory contents into `data/graph.db`
 ****
 
-image::../img/neo4j-import/northwind_import.png[]
+image::northwind_import.png[]
 
 As I was flying to London on Sunday I had enough time to finish the first iteration and write this blog post. So a weekend well spent.
 
