@@ -1,8 +1,8 @@
-== Building an Import Tool for Relational to Neo4j over one Iekend
+== Building an Import Tool for Relational to Neo4j over one Weekend
 
 Last Saturday Night around 11pm when the family was fast asleep, I decided to finally write a tool that I had wanted to build for a while...
 
-=== An automatic importer for relational databases wento Neo4j.
+=== An automatic importer for relational databases into Neo4j.
 
 I had all the ingredients at hand
 
@@ -31,10 +31,10 @@ The first step was connecting to the relational database using the provided _JDB
 Extracting the database metadata into our own `TableInfo`-objects was next. I extracted table name, primary and foreign keys. This happens in `MetaDataReader`.
 
 Next in line was setting up the [ParallelBatchImporter] with default values for configuration, loggers and monitors.
-It expects its `Input` as two iterables for `InputNodes` and `InputRelationships`.
+It expects its `Input` as two Iterables for `InputNodes` and `InputRelationships`.
 
 For each of the tables found, I read their content using plain SQL in `DataReader` returning a `ResultSet`.
-Those results are transformed in `Transformer.stream()` wento InputNodes and InputRelationships according to the rules listed above.
+Those results are transformed in `Transformer.stream()` into InputNodes and InputRelationships according to the rules listed above.
 
 The tricky thing here was that one row can result in multiple Inputs (e.g. a row with several foreign keys to other tables), so I couldn't use the Iterator abstraction.
 That's why I decided to go with two blocking, limited Queues for nodes and relationships respectively which are filled from the transformed relational result streams.
@@ -94,13 +94,13 @@ Looking at the meta-information in the Neo4j Browser shows that all expected lab
 It nicely imported the `OrderDetails` and `EmployeeTerritories` JOIN-tables as relationships.
 
 ****
-To see the database in Neo4j Browser, shutdown Neo4j first with `bin/neo4j stop` then you either have 
+To see the database in Neo4j Browser, shutdown Neo4j first with `bin/neo4j stop` then you either have to
 
-. to configure the path to the database in `conf/neo4j-server.properties` or
+. configure the path to the database in `conf/neo4j-server.properties` or
 . copy the directory contents into `data/graph.db`
 ****
 
-image::northwind_import.png[]
+image::../img/neo4j-import/northwind_import.png[]
 
 As I was flying to London on Sunday I had enough time to finish the first iteration and write this blog post. So a weekend well spent.
 
@@ -108,5 +108,5 @@ Here you can find the tool: https://github.com/jexp/neo4j-rdbms-import
 
 *PLEASE* test it out with your relational databases and send me feedback, best as https://github.com/jexp/neo4j-rdbms-import/issues[GitHub Issues].
 
-There are some more ideas, especially around paralellizing the reads from the relational database, 
+There are some more ideas, especially around parallelizing the reads from the relational database, 
 configuring the mentioned rules and transformation and packaging it all up in to a nice little tool that can also be used by non-developers.
