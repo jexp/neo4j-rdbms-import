@@ -1,34 +1,65 @@
 package org.neo4j.imports;
 
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 
 /**
 * @author mh
 * @since 01.03.15
 */
 public class Queues<T> {
-    private final ArrayBlockingQueue<T>[] queues;
+    private int rounds;
+    private final int capacity;
+    private ArrayBlockingQueue<T> current;
+    private ArrayBlockingQueue<T> next;
 
-    public Queues(int count, int capacity) {
-        queues = new ArrayBlockingQueue[count];
-        for (int i = 0; i < count; i++) {
-            queues[i] = new ArrayBlockingQueue<T>(capacity);
-        }
+    public Queues(int rounds, int capacity) {
+        this.rounds = rounds;
+        this.capacity = capacity;
+        current = new ArrayBlockingQueue<T>(capacity);
     }
 
     public void put(T element) throws InterruptedException {
-        for (ArrayBlockingQueue<T> queue : queues) {
-            queue.put(element);
-        }
+        current.put(element);
     }
 
-    public BlockingQueue<T> queue(int i) {
-        if (i >= queues.length) throw new IndexOutOfBoundsException("No more queues: "+i);
-        return queues[i];
-        // todo clear and discard old queues???
+    public T take() throws InterruptedException {
+        T next = current.take();
+        dump(false);
+        if (this.next != null) {
+            this.next.put(next);
+        }
+        return next;
     }
-    public int queues() {
-        return queues.length;
+
+    int counter = 0;
+    private void dump(boolean force) {
+//        ++counter;
+//        if (force || counter % 100_000 == 0) {
+//            System.out.println("\nRound " + rounds
+//                    + " current " + current.size() + " next " + (this.next == null ? "n.a" : this.next.size()));
+//        }
+    }
+
+    public ArrayBlockingQueue<T> next() {
+        dump(true);
+        rounds--;
+        if (rounds < 0) {
+            throw new IllegalStateException("More queue usages than indicated");
+        }
+        if (next==null) {
+            if (rounds > 0)
+                next = new ArrayBlockingQueue<T>(capacity);
+            return current;
+        }
+        if (!current.isEmpty()) throw new IllegalStateException("Queue not empty");
+        current.clear();
+        ArrayBlockingQueue<T> tmp=current;
+        current = next;
+        next = tmp;
+        if (rounds == 0 && next != null) {
+            next.clear();
+            next = null;
+        }
+        return current;
     }
 }

@@ -19,7 +19,7 @@ public class Transformer {
     public static final InputRelationship END_REL = new InputRelationship(null,-1,-1,null,null, -1,-1,null,null);
 
     public void stream(TableInfo table, Rules rules, final ResultSet rs, Queues<InputNode> nodes, Queues<InputRelationship> rels) throws SQLException, InterruptedException {
-        System.out.println("Reading Table as node? "+rules.isNode(table)+" "+table);
+        System.out.println("\nReading Table as "+(rules.isNode(table) ? "node":"relationship") +" "+table);
         if (rules.isNode(table)) {
             streamNodes(table, rules, rs, nodes, rels);
         } else {
@@ -44,7 +44,6 @@ public class Transformer {
                 rels.put(relationship);
             }
         }
-        ;
     }
 
     private Object extractPrimaryKeys(Rules rules, ResultSet rs, String[] pks) throws SQLException {

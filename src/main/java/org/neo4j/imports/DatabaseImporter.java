@@ -22,7 +22,6 @@ import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -53,8 +52,8 @@ public class DatabaseImporter {
         final ParallelBatchImporter importer = new ParallelBatchImporter(storeDir, Configuration.DEFAULT, logging, ExecutionMonitors.defaultVisible());
         TableInfo[] tables = MetaDataReader.extractTables(conn, schema, rules);
 
-        final Queues<InputNode> nodes = new Queues<>(2,10_000_000);
-        final Queues<InputRelationship> rels = new Queues<>(2,50_000_000);
+        final Queues<InputNode> nodes = new Queues<>(2,5_000_000);
+        final Queues<InputRelationship> rels = new Queues<>(2,25_000_000);
         final AtomicBoolean done = new AtomicBoolean();
         Thread thread = new Thread() {
             public void run() {
@@ -71,6 +70,7 @@ public class DatabaseImporter {
         for (TableInfo table : tables) {
             ResultSet rs = DataReader.readTableData(conn, table);
             new Transformer().stream(table, rules,rs,nodes,rels);
+            rs.getStatement().close();
         }
         nodes.put(Transformer.END_NODE);
         rels.put(Transformer.END_REL);
@@ -135,8 +135,8 @@ public class DatabaseImporter {
 
         @Override
         public InputIterator<T> iterator() {
-            System.out.println("iterator "+ type());
-            final BlockingQueue<T> queue = nextQueue();
+//            System.out.println("iterator "+ type());
+            queues.next();
             return new InputIterator<T>() {
                 long position;
                 T element = nextElement();
@@ -144,7 +144,7 @@ public class DatabaseImporter {
                 private T nextElement() {
                     try {
                         position++;
-                        T next = queue.take();
+                        T next = queues.take();
                         return next.equals(tombstone) ? null : next;
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
@@ -190,8 +190,5 @@ public class DatabaseImporter {
             return tombstone.getClass().getSimpleName();
         }
 
-        private BlockingQueue<T> nextQueue() {
-            return queues.queue(index++);
-        }
     }
 }

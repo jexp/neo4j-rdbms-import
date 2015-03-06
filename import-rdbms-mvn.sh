@@ -6,5 +6,6 @@ shift
 DB=${1-northwind.db}
 shift
 if [ -d "$DB" ]; then rm -r "$DB"; fi
+export MAVEN_OPTS="-Xmx4G"
 mvn compile exec:java -Dexec.mainClass="org.neo4j.imports.DatabaseImporter" -Dschemacrawler.log_level=SEVERE \
    -Dexec.args="$JDBC $SCHEMA $DB $*" 2>&1 | grep -v '\(INFO\|debug\|WARN\|SchemaCrawler\)'

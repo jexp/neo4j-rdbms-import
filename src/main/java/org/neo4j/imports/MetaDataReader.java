@@ -93,7 +93,7 @@ public class MetaDataReader {
 //TODO check and think
 //                if (fks.containsKey(pkName)) continue;
 //TODO rule
-                if (isForeignKeyPart(fks, pkName)) continue;
+//                if (isForeignKeyPart(fks, pkName)) continue;
                 pks.add(pkName);
             }
 //            System.out.println("Real? Primary Keys " + pks);

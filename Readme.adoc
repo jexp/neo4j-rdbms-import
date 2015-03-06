@@ -36,6 +36,6 @@ e.g.
 * Indexes
 * Compound Indexes (create artificial property)
 * Skip keys
-* Limit row count, by time
+* Limit row rounds, by time
 * Custom SQL statements
 * Configure concurrency for JDBC reads
