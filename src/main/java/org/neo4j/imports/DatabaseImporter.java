@@ -69,7 +69,7 @@ public class DatabaseImporter {
 
         for (TableInfo table : tables) {
             ResultSet rs = DataReader.readTableData(conn, table);
-            new Transformer().stream(table, rules,rs,nodes,rels);
+            new Transformer().stream(table, rules, rs, nodes, rels);
             rs.getStatement().close();
         }
         nodes.put(Transformer.END_NODE);
@@ -175,6 +175,10 @@ public class DatabaseImporter {
                 @Override
                 public boolean hasNext() {
                     return element != null;
+                }
+
+                @Override
+                public void remove() {
                 }
 
                 @Override
