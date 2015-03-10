@@ -22,6 +22,9 @@ import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -52,8 +55,8 @@ public class DatabaseImporter {
         final ParallelBatchImporter importer = new ParallelBatchImporter(storeDir, Configuration.DEFAULT, logging, ExecutionMonitors.defaultVisible());
         TableInfo[] tables = MetaDataReader.extractTables(conn, schema, rules);
 
-        final Queues<InputNode> nodes = new Queues<>(2,5_000_000);
-        final Queues<InputRelationship> rels = new Queues<>(2,25_000_000);
+        final BlockingQueue<InputNode> nodes = new ArrayBlockingQueue<>(1_000_000);
+        final BlockingQueue<InputRelationship> rels = new ArrayBlockingQueue<>(5_000_000);
         final AtomicBoolean done = new AtomicBoolean();
         Thread thread = new Thread() {
             public void run() {
@@ -81,7 +84,7 @@ public class DatabaseImporter {
         thread.join();
     }
 
-    private Input createInput(final Queues<InputNode> nodes, final Queues<InputRelationship> rels) {
+    private Input createInput(final BlockingQueue<InputNode> nodes, final BlockingQueue<InputRelationship> rels) {
         return new Input() {
             @Override
             public InputIterable<InputNode> nodes() {
@@ -122,21 +125,29 @@ public class DatabaseImporter {
     }
 
     private static class QueueInputIterable<T> implements InputIterable<T> {
-        private final Queues<T> queues;
+        private final BlockingQueue<T> queues;
         private final T tombstone;
         private int index = 0;
         private String source;
 
-        public QueueInputIterable(T tombstone, Queues<T> queues, String source) {
+        public QueueInputIterable(T tombstone, BlockingQueue<T> queues, String source) {
             this.queues = queues;
             this.tombstone = tombstone;
             this.source = source;
         }
 
+
+        @Override
+        public boolean supportsMultiplePasses()
+        {
+            return false;
+        }
+
         @Override
         public InputIterator<T> iterator() {
+
 //            System.out.println("iterator "+ type());
-            queues.next();
+//            queues.next();
             return new InputIterator<T>() {
                 long position;
                 T element = nextElement();

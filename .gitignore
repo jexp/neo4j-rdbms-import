@@ -18,3 +18,4 @@ target
 gc.log
 *.zip
 zip19.sh
+not-imported.bad

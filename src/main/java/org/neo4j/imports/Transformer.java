@@ -7,6 +7,7 @@ import org.neo4j.unsafe.impl.batchimport.input.InputRelationship;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.concurrent.BlockingQueue;
 
 /**
  * @author mh
@@ -18,7 +19,7 @@ public class Transformer {
     public static final InputNode END_NODE = new InputNode(null,-1,-1,-1, null, null, null, null);
     public static final InputRelationship END_REL = new InputRelationship(null,-1,-1,null,null, -1,-1,null,null);
 
-    public void stream(TableInfo table, Rules rules, final ResultSet rs, Queues<InputNode> nodes, Queues<InputRelationship> rels) throws SQLException, InterruptedException {
+    public void stream(TableInfo table, Rules rules, final ResultSet rs, BlockingQueue<InputNode> nodes, BlockingQueue<InputRelationship> rels) throws SQLException, InterruptedException {
         System.out.println("\nReading Table as "+(rules.isNode(table) ? "node":"relationship") +" "+table);
         if (rules.isNode(table)) {
             streamNodes(table, rules, rs, nodes, rels);
@@ -27,7 +28,7 @@ public class Transformer {
         }
     }
 
-    public void streamNodes(TableInfo table, Rules rules, final ResultSet rs, Queues<InputNode> nodes, Queues<InputRelationship> rels) throws SQLException, InterruptedException {
+    public void streamNodes(TableInfo table, Rules rules, final ResultSet rs, BlockingQueue<InputNode> nodes, BlockingQueue<InputRelationship> rels) throws SQLException, InterruptedException {
         Group group = new Group.Adapter(table.index, table.table);
         String[] labels = rules.labelsFor(table);
         Object[] props = prepareProps(table, rules);
@@ -81,7 +82,7 @@ public class Transformer {
         return newProps;
     }
 
-    public void streamRels(TableInfo table, Rules rules, final ResultSet rs, Queues<InputRelationship> rels) throws SQLException, InterruptedException {
+    public void streamRels(TableInfo table, Rules rules, final ResultSet rs, BlockingQueue<InputRelationship> rels) throws SQLException, InterruptedException {
         String relType = rules.relTypeFor(table);
         Object[] props = prepareProps(table,rules);
         RelInfo[] relInfos = rules.relsFor(table);
