@@ -1,9 +1,17 @@
 package org.neo4j.imports;
 
+import org.apache.commons.io.IOUtils;
 import org.neo4j.unsafe.impl.batchimport.input.Group;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.sql.Blob;
+import java.sql.SQLException;
 import java.util.*;
+import java.util.stream.Collectors;
+
+import static java.util.Arrays.asList;
 
 /**
  * @author mh
@@ -11,32 +19,18 @@ import java.util.*;
  */
 public class Rules {
 
-    public static final RelInfo[] NO_REL_INFOS = new RelInfo[0];
     private final Set<String> skipTables = new HashSet<>();
 
-    public Rules() {
-        this(null);
-    }
-    public Rules(Collection<String> skipTables) {
-        if (skipTables!=null)
-            this.skipTables.addAll(skipTables);
+    public Rules(String... skipTables) {
+        this.skipTables.addAll((asList(skipTables)));
     }
 
     String propertyNameFor(TableInfo table, String field) {
         return field;
     }
 
-    String[] propertyNamesFor(TableInfo table) {
-// different rules
-//            return table.fields;
-//            return Arrays.copyOf(table.fields,table.fields.length);
-        int length = table.fieldCount();
-        String[] propNames = new String[length];
-        for (int i = 0; i < length; i++) {
-            propNames[i] = propertyNameFor(table, table.fields[i]);
-        }
-        ;
-        return propNames;
+    List<String> propertyNamesFor(TableInfo table) {
+        return table.fields.stream().map((field) -> propertyNameFor(table, field)).collect(Collectors.toList());
     }
 
     String[] labelsFor(TableInfo table) {
@@ -49,39 +43,46 @@ public class Rules {
 
     private String unquote(String name) {
         boolean quoted = name.charAt(0) == '`';
-        return quoted ? name.substring(1,name.length()-1) : name;
+        return quoted ? name.substring(1, name.length() - 1) : name;
     }
 
     String relTypeFor(TableInfo table) {
-        return unquote(table.table).replaceAll("([a-z]) ?([A-Z])","$1_$2").toUpperCase().replace(' ','_');
+        return unquote(table.table).replaceAll("([a-z]) ?([A-Z])", "$1_$2").toUpperCase().replace(' ', '_');
     }
 
     boolean isNode(TableInfo table) {
         return table.hasPk();
     }
 
-    RelInfo[] relsFor(TableInfo table) {
-        if (table.fks == null) return NO_REL_INFOS;
-        RelInfo[] result = new RelInfo[table.fks.size()];
-        int i = 0;
-        for (Map.Entry<List<String>, String> entry : table.fks.entrySet()) {
-            TableInfo tableInfo = TableInfo.get(entry.getValue());
-            Group.Adapter group = new Group.Adapter(tableInfo.index, tableInfo.table);
-            List<String> fks = entry.getKey();
-            // todo fix
-            String[] fields = fks.toArray(new String[fks.size()]);
-            result[i++] = new RelInfo(group, relTypeFor(tableInfo), fields);
+    List<RelInfo> relsFor(TableInfo table) {
+        if (table.fks == null) {
+            return Collections.emptyList();
         }
-        return result;
+
+        return table.fks.entrySet().stream().map((entry) -> {
+            TableInfo tableInfo = TableInfo.get(entry.getValue());
+            // todo fix
+            return new RelInfo(new Group.Adapter(tableInfo.index, tableInfo.table),
+                    relTypeFor(tableInfo), entry.getKey());
+        }).collect(Collectors.toList());
     }
 
     public Object transformPk(Object pk) {
-        if (pk==null) return null; else return pk.toString();
+        if (pk == null) return null;
+        else return pk.toString();
     }
 
-    public Object convertValue(TableInfo table, String field, Object value) {
-        if (value instanceof Date) return ((Date)value).getTime();
-        if (value instanceof BigDecimal) return ((BigDecimal)value).doubleValue(); // or string??
+    public Object convertValue(TableInfo table, String field, Object value) throws SQLException, IOException {
+        if (value instanceof Date) {
+//            return 0;
+            return ((Date) value).getTime();
+        }
+        if (value instanceof BigDecimal) return ((BigDecimal) value).doubleValue(); // or string??
+        if (value instanceof Blob) {
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            IOUtils.copy(((Blob) value).getBinaryStream(), bo);
+            return bo.toByteArray(); // or string??
+        }
         // todo importer should ignore null values
         if (value == null) return "";
         return value;

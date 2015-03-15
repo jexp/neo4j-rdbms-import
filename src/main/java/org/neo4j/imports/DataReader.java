@@ -9,7 +9,13 @@ import java.sql.SQLException;
  * @since 01.03.15
  */
 public class DataReader {
-    public static ResultSet readTableData(Connection conn, TableInfo table) throws SQLException {
+    private final Connection conn;
+
+    public DataReader(Connection conn) {
+        this.conn = conn;
+    }
+
+    public   ResultSet readTableData(TableInfo table) throws SQLException {
         // todo custom sql statements, limit, skip fields, fixed field order,
         return conn.createStatement().executeQuery("SELECT * from " + table.table);
     }

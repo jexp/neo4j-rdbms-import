@@ -22,10 +22,10 @@ public class DataImporterNorthwindTest {
         FileUtils.deleteRecursively(new File(STORE_DIR));
         long time = System.currentTimeMillis();
         Rules rules = new Rules(); // asList("titles")
-        new DatabaseImporter("jdbc:mysql://localhost:3306/northwind?user=root", "northwind",STORE_DIR).run(rules);
+        new DatabaseImporter("jdbc:mysql://localhost:3306/northwind?user=root", "northwind", STORE_DIR, rules).run();
         long delta = (System.currentTimeMillis() - time) / 1000;
         String result = importInfo();
-        System.out.println(result+ " in "+ delta + " seconds");
+        System.out.println(result + " in " + delta + " seconds");
     }
 
     private static String importInfo() {
@@ -33,7 +33,7 @@ public class DataImporterNorthwindTest {
         try (Transaction tx = db.beginTx()) {
             int nodes = IteratorUtil.count(db.getAllNodes());
             int rels = IteratorUtil.count(GlobalGraphOperations.at(db).getAllRelationships());
-            return "Imported nodes "+nodes+" rels "+rels;
+            return "Imported nodes " + nodes + " rels " + rels;
         } finally {
             db.shutdown();
         }

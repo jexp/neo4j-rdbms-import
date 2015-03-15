@@ -16,11 +16,11 @@ public class TableInfo {
 
     public final int index = TABLE_INDEX.getAndIncrement();
     public final String table;
-    public final String[] pk;
-    public final String[] fields;
+    public final List<String> pk;
+    public final List<String> fields;
     public final Map<List<String>, String> fks;
 
-    public TableInfo(String table, String[] pk, String[] fields, Map<List<String>, String> fks) {
+    public TableInfo(String table,List< String> pk, List<String> fields, Map<List<String>, String> fks) {
         this.table = table;
         this.pk = pk;
         this.fields = fields;
@@ -28,18 +28,18 @@ public class TableInfo {
     }
 
     public boolean hasPk() {
-        return pk != null && pk.length > 0;
+        return pk != null && pk.size() > 0;
     }
 
     public int fieldCount() {
-        return fields.length;
+        return fields.size();
     }
 
     public static TableInfo get(String table) {
         return TABLES.get(table);
     }
 
-    public static TableInfo add(String table, String[] pks, String[] fields, Map<List<String>, String> fks) {
+    public static TableInfo add(String table, List<String> pks, List<String> fields, Map<List<String>, String> fks) {
         TableInfo tableInfo = new TableInfo(table, pks, fields, fks);
         TABLES.put(table, tableInfo);
         return tableInfo;
@@ -50,8 +50,8 @@ public class TableInfo {
         return "TableInfo{" +
                 "index=" + index +
                 ", table='" + table + '\'' +
-                ", pk='" + Arrays.toString(pk) + '\'' +
-                ", fields=" + Arrays.toString(fields) +
+                ", pk='" + pk + '\'' +
+                ", fields=" + fields +
                 ", fks=" + fks +
                 '}';
     }

@@ -26,10 +26,10 @@ public class DataImporterEmployeeTest {
         FileUtils.deleteRecursively(new File(STORE_DIR));
         StopWatch watch = new StopWatch();
         Rules rules = new Rules(); // asList("titles")
-        new DatabaseImporter("jdbc:mysql://localhost:3306/employees?user=root", "employees",STORE_DIR).run(rules);
+        new DatabaseImporter("jdbc:mysql://localhost:3306/employees?user=root", "employees", STORE_DIR, rules).run();
 
         watch.lap("import");
-        System.err.println(watch.stop("import",importInfo()));
+        System.err.println(watch.stop("import", importInfo()));
     }
 
     private static String importInfo() {
@@ -38,7 +38,7 @@ public class DataImporterEmployeeTest {
         try (Transaction tx = db.beginTx()) {
             int nodes = IteratorUtil.count(db.getAllNodes());
             int rels = IteratorUtil.count(GlobalGraphOperations.at(db).getAllRelationships());
-            return "Imported nodes "+nodes+" rels "+rels;
+            return "Imported nodes " + nodes + " rels " + rels;
         } finally {
             db.shutdown();
         }

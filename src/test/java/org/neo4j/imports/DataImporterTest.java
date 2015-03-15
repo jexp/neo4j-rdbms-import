@@ -27,10 +27,10 @@ public class DataImporterTest {
 
         FileUtils.deleteRecursively(new File(STORE_DIR));
         long time = System.currentTimeMillis();
-        new DatabaseImporter("jdbc:derby:memory:test",null, STORE_DIR).run(new Rules());
+        new DatabaseImporter("jdbc:derby:memory:test", null, STORE_DIR, new Rules()).run();
 
         String result = assertImport();
-        System.out.println(result+ " in "+(System.currentTimeMillis()-time)/1000+ " seconds");
+        System.out.println(result + " in " + (System.currentTimeMillis() - time) / 1000 + " seconds");
     }
 
     private static void setupDatabase() throws SQLException {
@@ -57,7 +57,7 @@ public class DataImporterTest {
             Assert.assertEquals(USERS, nodes);
             int rels = IteratorUtil.count(GlobalGraphOperations.at(db).getAllRelationships());
             Assert.assertEquals(FRIENDSHIPS, rels);
-            return "Imported nodes "+nodes+" rels "+rels;
+            return "Imported nodes " + nodes + " rels " + rels;
         } finally {
             db.shutdown();
         }
@@ -65,18 +65,19 @@ public class DataImporterTest {
 
     private static void insertUsers(Connection connection, int max) throws SQLException {
         PreparedStatement pstmt = connection.prepareStatement("INSERT INTO USERS (id,name) values(?,?)");
-        for (int i=0;i<max;i++) {
-            pstmt.setInt(1,i);
-            pstmt.setString(2,"Name "+i);
+        for (int i = 0; i < max; i++) {
+            pstmt.setInt(1, i);
+            pstmt.setString(2, "Name " + i);
             pstmt.addBatch();
         }
         pstmt.executeBatch();
         pstmt.close();
     }
+
     private static void insertFriendships(Connection connection, int max) throws SQLException {
         PreparedStatement pstmt = connection.prepareStatement("INSERT INTO FRIENDS (id1,id2) values(?,?)");
-        for (int i=0;i<max;i++) {
-            pstmt.setInt(1,i);
+        for (int i = 0; i < max; i++) {
+            pstmt.setInt(1, i);
             pstmt.setInt(2, (i + 100) % max);
             pstmt.addBatch();
         }

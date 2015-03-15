@@ -23,11 +23,11 @@ public class DataImporterSakilaTest {
     public static void main(String[] args) throws Exception {
         FileUtils.deleteRecursively(new File(STORE_DIR));
         long time = System.currentTimeMillis();
-        new DatabaseImporter("jdbc:mysql://localhost:3306/sakila?user=root", "sakila",STORE_DIR).run(new Rules());
+        new DatabaseImporter("jdbc:mysql://localhost:3306/sakila?user=root", "sakila", STORE_DIR, new Rules()).run();
 
         long delta = (System.currentTimeMillis() - time) / 1000;
         String result = importInfo();
-        System.out.println(result+ " in "+ delta + " seconds");
+        System.out.println(result + " in " + delta + " seconds");
     }
 
     private static String importInfo() {
@@ -36,7 +36,7 @@ public class DataImporterSakilaTest {
         try (Transaction tx = db.beginTx()) {
             int nodes = IteratorUtil.count(db.getAllNodes());
             int rels = IteratorUtil.count(GlobalGraphOperations.at(db).getAllRelationships());
-            return "Imported nodes "+nodes+" rels "+rels;
+            return "Imported nodes " + nodes + " rels " + rels;
         } finally {
             db.shutdown();
         }

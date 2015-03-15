@@ -7,6 +7,7 @@ import schemacrawler.schemacrawler.SchemaInfoLevel;
 import schemacrawler.utility.SchemaCrawlerUtility;
 
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.*;
 
 /**
@@ -14,42 +15,44 @@ import java.util.*;
  * @since 01.03.15
  */
 public class MetaDataReader {
-    static TableInfo[] extractTables(Connection conn, String schemaName, Rules rules) throws Exception {
+    static TableInfo[] extractTables(Connection conn, final String schemaName, Rules rules) throws SchemaCrawlerException, SQLException {
         ArrayList<TableInfo> tableList = new ArrayList<TableInfo>(100);
 
         final SchemaCrawlerOptions options = new SchemaCrawlerOptions();
         options.setSchemaInfoLevel(SchemaInfoLevel.standard());
+        System.out.println("my catalog =" + conn.getCatalog());
+        options.setSchemaInclusionRule(schemaName::equals);
 
         final Catalog catalog = SchemaCrawlerUtility.getCatalog(conn, options);
+        System.out.println("schem ! ");
 
-        for (final Schema schema : catalog.getSchemas()) {
-            System.out.println("Schema: "+schema);
-            if (schemaName != null && !schemaName.equals(schema.getFullName())) continue;
-            for (final Table table : catalog.getTables(schema)) {
-                String tableName = table.getName();
-                System.out.println(table + " pk " + table.getPrimaryKey() + " fks " + table.getForeignKeys() + " type " + table.getTableType());
-                if (rules.skipTable(tableName) || table.getTableType().isView()) {
-                    System.out.println("SKIPPED");
-                    continue;
-                }
-                List<Column> columns = table.getColumns();
-                List<String> fields = new ArrayList<>(columns.size());
-                for (final Column column : columns) {
-//                    System.out.println("     o--> " + column + " pk: "+ column.isPartOfPrimaryKey() + " fk: " + column.isPartOfForeignKey());
-                    String columnName = column.getName();
-                    if (column.isPartOfPrimaryKey() && rules.skipPrimaryKey(tableName, columnName)) {
-                        // skip, todo strategy
-                    } else if (column.isPartOfForeignKey()) {
-                        // skip, todo strategy
-                    } else {
-                        fields.add(columnName);
-                    }
-                }
-                Map<List<String>, String> fks = extractForeignKeys(table);
-                String[] pks = extractPrimaryKeys(table, fks);
 
-                tableList.add(TableInfo.add(tableName, pks, fields.toArray(new String[fields.size()]), fks));
+        final Schema schema = catalog.getSchema(schemaName);
+        System.out.println("Schema: " + schema);
+
+        for (final Table table : catalog.getTables(schema)) {
+            String tableName = table.getName();
+
+            System.out.println(table + " pk " + table.getPrimaryKey() + " fks " + table.getForeignKeys() + " type " + table.getTableType());
+            if (rules.skipTable(tableName) || table.getTableType().isView()) {
+                System.out.println("SKIPPED");
+                continue;
             }
+            List<Column> columns = table.getColumns();
+            List<String> fields = new ArrayList<>(columns.size());
+            for (final Column column : columns) {
+//                    System.out.println("     o--> " + column + " pk: "+ column.isPartOfPrimaryKey() + " fk: " + column.isPartOfForeignKey());
+                String columnName = column.getName();
+                if (column.isPartOfPrimaryKey() && rules.skipPrimaryKey(tableName, columnName)) {
+                    // skip, todo strategy
+                } else if (column.isPartOfForeignKey()) {
+                    // skip, todo strategy
+                } else {
+                    fields.add(columnName);
+                }
+            }
+            Map<List<String>, String> fks = extractForeignKeys(table);
+            tableList.add(TableInfo.add(tableName, extractPrimaryKeys(table, fks), fields, fks));
         }
 
         return tableList.toArray(new TableInfo[tableList.size()]);
@@ -82,7 +85,7 @@ public class MetaDataReader {
         return fks;
     }
 
-    private static String[] extractPrimaryKeys(Table table, Map<List<String>, String> fks) {
+    private static List<String> extractPrimaryKeys(Table table, Map<List<String>, String> fks) {
         // todo handle composite keys
         List<String> pks = new ArrayList<>();
 //        String pk = null;
@@ -98,7 +101,7 @@ public class MetaDataReader {
             }
 //            System.out.println("Real? Primary Keys " + pks);
         }
-        return pks.isEmpty() ? null : pks.toArray(new String[pks.size()]);
+        return pks;
     }
 
     private static boolean isForeignKeyPart(Map<List<String>, String> fks, String columnName) {

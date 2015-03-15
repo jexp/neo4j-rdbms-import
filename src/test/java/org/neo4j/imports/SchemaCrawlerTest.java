@@ -1,9 +1,5 @@
 package org.neo4j.imports;
 
-import org.apache.derby.jdbc.AutoloadedDriver;
-import org.apache.derby.jdbc.Driver42;
-import org.apache.derby.jdbc.EmbeddedDriver;
-import org.apache.derby.jdbc.InternalDriver;
 import schemacrawler.schema.Catalog;
 import schemacrawler.schema.Column;
 import schemacrawler.schema.Schema;
@@ -39,15 +35,12 @@ public class SchemaCrawlerTest {
 
         final Catalog catalog = SchemaCrawlerUtility.getCatalog(connection, options);
 
-        for (final Schema schema: catalog.getSchemas())
-        {
+        for (final Schema schema : catalog.getSchemas()) {
             System.out.println(schema);
-            for (final Table table: catalog.getTables(schema))
-            {
-                System.out.println("o--> " + table + " pk " + table.getPrimaryKey() + " fks "+table.getForeignKeys()+ " type "+table.getTableType());
-                for (final Column column: table.getColumns())
-                {
-                    System.out.println("     o--> " + column + " pk: "+ column.isPartOfPrimaryKey() + " fk: " + column.isPartOfForeignKey());
+            for (final Table table : catalog.getTables(schema)) {
+                System.out.println("o--> " + table + " pk " + table.getPrimaryKey() + " fks " + table.getForeignKeys() + " type " + table.getTableType());
+                for (final Column column : table.getColumns()) {
+                    System.out.println("     o--> " + column + " pk: " + column.isPartOfPrimaryKey() + " fk: " + column.isPartOfForeignKey());
                 }
             }
         }
