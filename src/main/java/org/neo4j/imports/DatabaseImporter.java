@@ -31,7 +31,6 @@ public class DatabaseImporter {
 
     private final String storeDir;
     private final DataReader reader;
-    private final String source;
     private final Rules rules;
     private final TableInfo[] tables;
 
@@ -41,7 +40,6 @@ public class DatabaseImporter {
         Connection conn = DriverManager.getConnection(jdbcUrl);
         tables = MetaDataReader.extractTables(conn, schema, rules);
         reader = new DataReader(conn);
-        source = jdbcUrl + " schema: " + schema;
     }
 
     public static void main(String[] args) throws Exception {
@@ -56,12 +54,12 @@ public class DatabaseImporter {
         importer.doImport(new Input() {
             @Override
             public InputIterable<InputNode> nodes() {
-                return new NodeGenerator(reader, rules, tables, source);
+                return new NodeGenerator(reader, rules, tables);
             }
 
             @Override
             public InputIterable<InputRelationship> relationships() {
-                return new AsyncInputIterable<>(new RelationshipGenerator(reader, rules, tables, source));
+                return new RelationshipGenerator(reader, rules, tables);
             }
 
             @Override

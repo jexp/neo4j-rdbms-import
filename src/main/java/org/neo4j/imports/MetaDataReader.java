@@ -1,6 +1,7 @@
 package org.neo4j.imports;
 
 import schemacrawler.schema.*;
+import schemacrawler.schemacrawler.InclusionRule;
 import schemacrawler.schemacrawler.SchemaCrawlerException;
 import schemacrawler.schemacrawler.SchemaCrawlerOptions;
 import schemacrawler.schemacrawler.SchemaInfoLevel;
@@ -21,7 +22,11 @@ public class MetaDataReader {
         final SchemaCrawlerOptions options = new SchemaCrawlerOptions();
         options.setSchemaInfoLevel(SchemaInfoLevel.standard());
         System.out.println("my catalog =" + conn.getCatalog());
-        options.setSchemaInclusionRule(schemaName::equals);
+        options.setSchemaInclusionRule(new InclusionRule() {
+            @Override public boolean test(String anObject) {
+                return schemaName.equals(anObject);
+            }
+        });
 
         final Catalog catalog = SchemaCrawlerUtility.getCatalog(conn, options);
         System.out.println("schem ! ");

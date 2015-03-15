@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.sql.Blob;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
 
@@ -30,7 +29,11 @@ public class Rules {
     }
 
     List<String> propertyNamesFor(TableInfo table) {
-        return table.fields.stream().map((field) -> propertyNameFor(table, field)).collect(Collectors.toList());
+        List<String> result = new ArrayList<>();
+        for (String field : table.fields) {
+            result.add(propertyNameFor(table, field));
+        }
+        return result;
     }
 
     String[] labelsFor(TableInfo table) {
@@ -58,13 +61,15 @@ public class Rules {
         if (table.fks == null) {
             return Collections.emptyList();
         }
+        List<RelInfo> result = new ArrayList<>();
+        for (Map.Entry<List<String>, String> entry : table.fks.entrySet()) {
 
-        return table.fks.entrySet().stream().map((entry) -> {
             TableInfo tableInfo = TableInfo.get(entry.getValue());
             // todo fix
-            return new RelInfo(new Group.Adapter(tableInfo.index, tableInfo.table),
-                    relTypeFor(tableInfo), entry.getKey());
-        }).collect(Collectors.toList());
+            result.add(new RelInfo(new Group.Adapter(tableInfo.index, tableInfo.table),
+                    relTypeFor(tableInfo), entry.getKey()));
+        }
+        return result;
     }
 
     public Object transformPk(Object pk) {

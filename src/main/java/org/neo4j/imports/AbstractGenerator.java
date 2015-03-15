@@ -9,7 +9,8 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Stream;
+
+import static java.util.Arrays.asList;
 
 /**
  * @author tbaum
@@ -17,11 +18,9 @@ import java.util.stream.Stream;
  */
 public abstract class AbstractGenerator<T> implements InputIterable<T> {
     static final Object[] NO_PROPS = new Object[0];
-    private final String source;
     private final TableInfo[] tables;
 
-    protected AbstractGenerator(String source, TableInfo[] tables) {
-        this.source = source;
+    protected AbstractGenerator(TableInfo[] tables) {
         this.tables = tables;
     }
 
@@ -29,59 +28,47 @@ public abstract class AbstractGenerator<T> implements InputIterable<T> {
         return false;
     }
 
-    Stream<T> stream() {
-        return Stream.of(tables).map(table -> {
-            try {
-                return streamNodes(table);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }).flatMap(s -> s);
-    }
-
-    abstract Stream<T> streamNodes(TableInfo table) throws Exception;
-
-    @Override
     public InputIterator<T> iterator() {
-        Iterator<T> iterator = stream().iterator();
-        return new InputIterator<T>() {
-            long position;
+        final Iterator<TableInfo> iterator = asList(tables).iterator();
 
-            @Override
-            public String sourceDescription() {
-                return source;
+        return new InputIterator.Adapter<T>() {
+            boolean hasNext = true;
+            Iterator<T> current = null;
+            T next = fetchNext();
+
+            @Override public boolean hasNext() {
+                return hasNext;
             }
 
-            @Override
-            public long lineNumber() {
-                return position;
+            @Override public T next() {
+                T result = next;
+                next = fetchNext();
+                return result;
             }
 
-            @Override
-            public long position() {
-                return position;
-            }
-
-            @Override
-            public void close() {
-            }
-
-            @Override
-            public boolean hasNext() {
-                return iterator.hasNext();
-            }
-
-            @Override
-            public void remove() {
-            }
-
-            @Override
-            public T next() {
-                position++;
-                return iterator.next();
+            private T fetchNext() {
+                while (true) {
+                    if (current == null || !current.hasNext()) {
+                        if (iterator.hasNext())
+                            try {
+                                current = streamNodes(iterator.next());
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        else {
+                            hasNext = false;
+                            return null;
+                        }
+                    }
+                    if (current.hasNext()) {
+                        return current.next();
+                    }
+                }
             }
         };
     }
+
+    abstract Iterator<T> streamNodes(TableInfo table) throws Exception;
 
     protected Object extractPrimaryKeys(Rules rules, ResultSet rs, List<String> pks) throws SQLException {
         // todo prepend table name instead of using groups (hint from MP)
@@ -117,9 +104,5 @@ public abstract class AbstractGenerator<T> implements InputIterable<T> {
             newProps[1 + i * 2] = rules.convertValue(table, field, rs.getObject(field));
         }
         return newProps;
-    }
-
-    public String sourceDescription() {
-        return source;
     }
 }

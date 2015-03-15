@@ -7,9 +7,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Stream;
 
-import static org.neo4j.imports.StreamUtil.streamOf;
+import static org.neo4j.imports.StreamUtil.iteratorOf;
 
 /**
  * @author mh
@@ -20,13 +19,13 @@ public class RelationshipGenerator extends AbstractGenerator<InputRelationship> 
     private final Rules rules;
     private final DataReader reader;
 
-    public RelationshipGenerator(DataReader reader, Rules rules, TableInfo[] tables, String source) {
-        super(source, tables);
+    public RelationshipGenerator(DataReader reader, Rules rules, TableInfo[] tables) {
+        super(tables);
         this.reader = reader;
         this.rules = rules;
     }
 
-    Stream<InputRelationship> streamNodes(TableInfo table) throws SQLException {
+    Iterator<InputRelationship> streamNodes(TableInfo table) throws SQLException {
         System.out.println("\nCreating relationships for " + table);
         if (rules.isNode(table)) {
             return importPkRels(table);
@@ -35,12 +34,12 @@ public class RelationshipGenerator extends AbstractGenerator<InputRelationship> 
         }
     }
 
-    private Stream<InputRelationship> importPkRels(TableInfo table) throws SQLException {
-        ResultSet rs = reader.readTableData(table);
-        Group group = new Group.Adapter(table.index, table.table);
-        List<RelInfo> relInfos = rules.relsFor(table);
+    private Iterator<InputRelationship> importPkRels(final TableInfo table) throws SQLException {
+        final ResultSet rs = reader.readTableData(table);
+        final Group group = new Group.Adapter(table.index, table.table);
+        final List<RelInfo> relInfos = rules.relsFor(table);
 
-        return streamOf(new StreamUtil.Supplier<InputRelationship>() {
+        return iteratorOf(new StreamUtil.Supplier<InputRelationship>() {
             private Object id;
             private Iterator<RelInfo> iterator;
 
@@ -69,23 +68,25 @@ public class RelationshipGenerator extends AbstractGenerator<InputRelationship> 
         });
     }
 
-    private Stream<InputRelationship> importFkRels(TableInfo table) throws SQLException {
-        ResultSet rs = reader.readTableData(table);
-        String relType = rules.relTypeFor(table);
-        Object[] props = prepareProps(table, rules);
-        List<RelInfo> relInfos = rules.relsFor(table);
+    private Iterator<InputRelationship> importFkRels(final TableInfo table) throws SQLException {
+        final ResultSet rs = reader.readTableData(table);
+        final String relType = rules.relTypeFor(table);
+        final Object[] props = prepareProps(table, rules);
+        final List<RelInfo> relInfos = rules.relsFor(table);
 
-        return streamOf(() -> {
-            while (rs.next()) {
-                Object fk1 = extractPrimaryKeys(rules, rs, relInfos.get(0).fields);
-                Object fk2 = extractPrimaryKeys(rules, rs, relInfos.get(1).fields);
-                if (fk1 != null && fk2 != null) {
-                    return new InputRelationship(table.table, rs.getRow(), 0, extractProps(table, rules, rs, props),
-                            null, relInfos.get(0).group, fk1, relInfos.get(1).group, fk2, relType, null);
+        return iteratorOf(new StreamUtil.Supplier<InputRelationship>() {
+            @Override public InputRelationship get() throws Exception {
+                while (rs.next()) {
+                    Object fk1 = extractPrimaryKeys(rules, rs, relInfos.get(0).fields);
+                    Object fk2 = extractPrimaryKeys(rules, rs, relInfos.get(1).fields);
+                    if (fk1 != null && fk2 != null) {
+                        return new InputRelationship(table.table, rs.getRow(), 0, extractProps(table, rules, rs, props),
+                                null, relInfos.get(0).group, fk1, relInfos.get(1).group, fk2, relType, null);
+                    }
                 }
+                rs.getStatement().close();
+                return null;
             }
-            rs.getStatement().close();
-            return null;
         });
     }
 }
