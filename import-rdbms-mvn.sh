@@ -8,6 +8,12 @@ DB=${1-northwind.db}
 shift
 if [ -d "$DB" ]; then rm -r "$DB"; fi
 
-mvn compile dependency:copy-dependencies
+mvn clean package dependency:copy-dependencies
 
-java -Xmx4G -cp $(for i in target/dependency/*.jar ; do echo -n $i":" ; done)target/neo4j-import-2.2-SNAPSHOT.jar org.neo4j.imports.DatabaseImporter $JDBC $SCHEMA $DB
+CP=target/neo4j-import-2.2.0.jar
+
+for i in target/dependency/*.jar ; do CP="$CP:$i"; done
+echo $CP
+
+echo java -Xmx4G -cp $CP org.neo4j.imports.DatabaseImporter $JDBC $SCHEMA $DB
+java -Xmx4G -cp $CP org.neo4j.imports.DatabaseImporter $JDBC $SCHEMA $DB

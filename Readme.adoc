@@ -17,7 +17,6 @@ e.g.
 
 `import-rdbms-mvn.sh "jdbc:mysql://localhost:3306/northwind?user=root" "northwind" "northwind.db"`
 
-
 === Transformation Rules
 
 * Table with primary key become nodes
@@ -39,3 +38,15 @@ e.g.
 * Limit row rounds, by time
 * Custom SQL statements
 * Configure concurrency for JDBC reads
+
+=== Ideas
+
+neo4j-rdbms-import
+--into ...
+--relationship-rule no-pk, two-fk, table% | default: no-pk
+--skip table% table%.field,table_.id | default none
+--rename: label: Capitalize,UP_CASE,camelCase,CamelCase | default:CapitalizeCamel
+          relationship:
+          property:
+
+* include and exclude with patterns (% and _)
