@@ -21,6 +21,7 @@ public class StreamUtil {
                 next = nextValue();
                 return result;
             }
+            public void remove() {}
 
             T nextValue() {
                 try {
@@ -41,6 +42,7 @@ public class StreamUtil {
             @Override public T next() {
                 return null;
             }
+            public void remove() {}
         };
     }
 
